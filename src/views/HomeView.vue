@@ -6,16 +6,19 @@
     <div style="float: left;">
       <div v-for="item in arr1" :key="item.id" class="single-filter">
         <span>{{ item.name }}</span>
-        <!-- <span style="float: right;">(全部)</span> -->
         <el-popover :popper-options="{ boundariesElement: 'viewport', removeOnDestroy: true }" placement="bottom"
           width="400" trigger="click">
-          <!-- <h4>{{ originData?.[item.name].length === item.checkedCities.length }}</h4> -->
           <el-checkbox v-model="item.checkAll" @change="(val) => handleCheckAllChange(val, item.name)">全选</el-checkbox>
           <div style="margin: 15px 0;"></div>
           <el-checkbox-group v-model="item.checkedCities" @change="(val) => handleCheckedCitiesChange(val, item.name)">
-            <el-checkbox v-for="city in originData[item.name]" :label="city" :key="city">{{ city }}</el-checkbox>
+            <!-- 【计数】字段数据量过多，暂时截取前200条数据，后续根据实际修改 -->
+            <el-checkbox
+              v-for="city in originData[item.name].length > 200 ? originData[item.name].slice(0, 200) : originData[item.name]"
+              :label="city" :key="city">{{ city }}</el-checkbox>
           </el-checkbox-group>
           <i slot="reference" style="float: right;cursor: pointer;" class="el-icon-coin"></i>
+          <!-- <el-button size="small" type="primary">确认</el-button>
+          <el-button size="small">取消</el-button> -->
         </el-popover>
       </div>
     </div>
@@ -27,8 +30,8 @@
     <div class="itxst">
       <div class="col">
         <div class="title">筛选器</div>
-        <draggable v-model="arr1" :group="groupA" animation="200" dragClass="dragClass" ghostClass="ghostClass"
-          chosenClass="chosenClass">
+        <draggable @start="onStart" v-model="arr1" @add="onPointUpdate" @sort="onPointUpdate" :group="groupA"
+          animation="200" dragClass="dragClass" ghostClass="ghostClass" chosenClass="chosenClass">
           <transition-group :style="style">
             <div class="item" v-for="item in arr1" :key="item.id">
               {{ item.name }}
@@ -38,8 +41,8 @@
       </div>
       <div class="col">
         <div class="title">行区域</div>
-        <draggable v-model="arr2" :group="groupB" animation="200" dragClass="dragClass" ghostClass="ghostClass"
-          chosenClass="chosenClass">
+        <draggable v-model="arr2" :group="groupB" @add="onPointUpdate" @sort="onPointUpdate" animation="200"
+          dragClass="dragClass" ghostClass="ghostClass" chosenClass="chosenClass">
           <transition-group :style="style">
             <div class="item" v-for="item in arr2" :key="item.id">
               {{ item.name }}
@@ -49,8 +52,8 @@
       </div>
       <div class="col">
         <div class="title">列区域</div>
-        <draggable v-model="arr3" :group="groupC" animation="200" dragClass="dragClass" ghostClass="ghostClass"
-          chosenClass="chosenClass">
+        <draggable v-model="arr3" :group="groupC" @add="onPointUpdate" @sort="onPointUpdate" animation="200"
+          dragClass="dragClass" ghostClass="ghostClass" chosenClass="chosenClass">
           <transition-group :style="style">
             <div class="item" v-for="item in arr3" :key="item.id">
               {{ item.name }}
@@ -60,8 +63,8 @@
       </div>
       <div class="col">
         <div class="title">求值区域</div>
-        <draggable v-model="arr4" :group="groupD" animation="300" dragClass="dragClass" ghostClass="ghostClass"
-          chosenClass="chosenClass">
+        <draggable v-model="arr4" :group="groupD" @add="onPointUpdate" @sort="onPointUpdate" animation="300"
+          dragClass="dragClass" ghostClass="ghostClass" chosenClass="chosenClass">
           <transition-group :style="style">
             <div class="item" v-for="item in arr4" :key="item.id">
               {{ item.name }}
@@ -69,6 +72,14 @@
           </transition-group>
         </draggable>
       </div>
+    </div>
+
+    <!-- 添加字段列表区域 -->
+    <div class="fields-wrap">
+      <h5>字段列表</h5>
+      <el-checkbox-group v-model="filedCheckList">
+        <el-checkbox v-for="(item, index) in allFiledList" :key="item + index" :label="item"></el-checkbox>
+      </el-checkbox-group>
     </div>
   </div>
 </template>
@@ -86,6 +97,9 @@ export default {
   },
   data() {
     return {
+      point: false,
+      allFiledList: [],
+      filedCheckList: [],
       originData: [],
       checkAll: false,
       checkedCities: [],
@@ -135,8 +149,8 @@ export default {
   },
   // 监听多个数据的改变，然后根据条件调取接口，更新页面
   watch: {
+    // point 只需要监听位置的改变,这样左侧筛选器监听不到数据改变，需要结合实际项目来做
     listenChange() {
-
       // 在这里拼接需要传递给后端的参数, 获取到最新的数据后传递给 TableCom 组件
       const index = this.formatData(this.arr2)?.map(it => it?.name)  // 行参数
       const columns = this.formatData(this.arr3)?.map(it => it?.name) // 列参数
@@ -163,7 +177,14 @@ export default {
       }
       console.log(bodyParams, 'bodyParams--拼接出的参数');
       this.params = JSON.parse(JSON.stringify(bodyParams))
-    }
+    },
+    // 监听字段列表是否被选中，暂时这样截取默认显示数据
+    filedCheckList(newVal) {
+      this.arr1 = this.handleDragField(newVal, 0, 4)
+      this.arr2 = this.handleDragField(newVal, 4, 6)
+      this.arr3 = this.handleDragField(newVal, 6, 7)
+      this.arr4 = this.handleDragField(newVal, 7, 8)
+    },
   },
   methods: {
     // 格式化获取的数据
@@ -172,7 +193,7 @@ export default {
     },
     // 处理 拖拽字段
     handleDragField(fieldList, sta, end) {
-      const dragData = fieldList?.splice(sta, end)?.map(it => {
+      const dragData = fieldList?.slice(sta, end)?.map(it => {
         return {
           id: Math.random() * 6,
           name: it,
@@ -191,22 +212,23 @@ export default {
           this.originData = res?.data?.data
           // 获取字段名列表
           const fieldList = Object.keys(res?.data?.data)
+          const cloneList = JSON.parse(JSON.stringify(fieldList))
+          this.allFiledList = cloneList
           // 筛选器字段，暂时这么处理，根据实际情况改变
-          this.arr1 = this.handleDragField(fieldList, 0, 4)
-          this.arr2 = this.handleDragField(fieldList, 0, 2)
-          this.arr3 = this.handleDragField(fieldList, 0, 1)
-          this.arr4 = this.handleDragField(fieldList, 0, 1)
+          // this.arr1 = this.handleDragField(fieldList, 0, 4)
+          // this.arr2 = this.handleDragField(fieldList, 0, 2)
+          // this.arr3 = this.handleDragField(fieldList, 0, 1)
+          // this.arr4 = this.handleDragField(fieldList, 0, 1)
         }
       })
     },
     //开始拖拽事件
     onStart() {
       this.drag = true;
-      return true;
     },
-    //拖拽结束事件
-    onEnd() {
-      this.drag = false;
+    //拖拽位置发生变化事件
+    onPointUpdate() {
+      this.point = !this.point
     },
     // 全选按钮事件，更新选中的数据
     handleCheckAllChange(val, name) {
@@ -290,7 +312,7 @@ export default {
   display: flex;
   flex-direction: column;
   min-height: 200px;
-  width: 300px;
+  width: 250px;
   float: right;
 
 }
@@ -336,5 +358,18 @@ export default {
   width: 150px;
   padding: 10px;
   margin: 10px;
+}
+
+.fields-wrap {
+  position: relative;
+  width: 100px;
+  height: 200px;
+  float: right;
+  margin-right: 50px;
+
+  .el-checkbox {
+    height: 35px;
+    line-height: 35px;
+  }
 }
 </style>

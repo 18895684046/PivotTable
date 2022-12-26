@@ -38,7 +38,7 @@ export default {
         url: "http://localhost:8080/data.json",
         data: params
       }).then(res => {
-        console.log(res);
+        // console.log(res);
         // 此处如果是封装后的 axios ，应该 res.data 就可以获取到数据，未封装的 axios ，需要 res.data.data
         // if (res.status === 200) {
         this.tableVal = res?.data?.data
@@ -51,7 +51,7 @@ export default {
 
 <style>
 .table-container {
-  width: 800px;
+  width: 700px;
   display: inline-block;
   margin-left: 40px;
   /* margin-top: 180px; */
@@ -60,7 +60,7 @@ export default {
 .wrap {
   font-size: 14px;
   text-align: center;
-  width: 800px;
+  width: 700px;
   /* float: left; */
   display: inline-block;
   border: 1px solid #ebebeb;
