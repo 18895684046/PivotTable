@@ -6,18 +6,18 @@
 </template>
 
 <script>
-import axios from 'axios'
+import axios from "axios";
 export default {
-  name: 'TableCom',
+  name: "TableCom",
   props: {
     msg: String,
-    params: Object
+    params: Object,
   },
   data() {
     // 定义变量
     return {
-      tableVal: ''
-    }
+      tableVal: "",
+    };
   },
   // mounted() {
   //   // 调用初始化函数
@@ -25,28 +25,36 @@ export default {
   // },
   watch: {
     // 当传递过来的参数发生改变时，重新调用函数，获取最新的数据
-    params(newVal) {
-      const curParams = JSON.parse(JSON.stringify(newVal))
-      this.loadData(curParams)
+    params(newVal, oldValue) {
+      const curParams = this.formatData(newVal);
+      const beforeParams = this.formatData(oldValue);
+      if (JSON.stringify(curParams) != JSON.stringify(beforeParams)) {
+        console.log(curParams, 'curParams');
+        this.loadData(curParams)
+      }
     },
   },
   methods: {
+    // 格式化获取的数据
+    formatData(data) {
+      return JSON.parse(JSON.stringify(data));
+    },
     async loadData(params) {
       // 把这个地址替换为正式访问接口，现在是放在本地 public 中
       await axios({
         method: "get",
         url: "http://localhost:8080/data.json",
-        data: params
-      }).then(res => {
+        data: params,
+      }).then((res) => {
         // console.log(res);
         // 此处如果是封装后的 axios ，应该 res.data 就可以获取到数据，未封装的 axios ，需要 res.data.data
         // if (res.status === 200) {
-        this.tableVal = res?.data?.data
+        this.tableVal = res?.data?.data;
         // }
-      })
-    }
-  }
-}
+      });
+    },
+  },
+};
 </script>
 
 <style>
@@ -83,7 +91,7 @@ export default {
 
 .wrap tr:hover {
   background-color: rgb(245, 247, 250);
-  transition: background-color .25s ease;
+  transition: background-color 0.25s ease;
 }
 
 .wrap td {
